@@ -102,3 +102,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# other
+src/webmaster_credentials.dat
+src/*.csv
