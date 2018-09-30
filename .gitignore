@@ -106,3 +106,4 @@ venv.bak/
 # other
 src/webmaster_credentials.dat
 src/*.csv
+src/keys

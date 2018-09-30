@@ -245,7 +245,7 @@ def main():
             day_str = day.strftime("%Y-%m-%d")
             output_rows = []
 
-            for filter_set in generate_filters(page=pages, country=args.countries):
+            for filter_set in generate_filters(page=pages, country=args.countries):  # query=[]
 
                 request = {
                     'startDate': day_str,
@@ -279,7 +279,8 @@ def main():
 
                     for row in response['rows']:
                         keys = ','.join(row['keys'])
-                        output_row = [day.timestamp(), keys, row['clicks'], row['impressions'], row['ctr'], row['position']]
+                        output_row = [day.timestamp(), keys, row['clicks'], row['impressions'], row['ctr'],
+                                      row['position']]
                         output_row.extend(filters)
                         output_rows.append(output_row)
 
