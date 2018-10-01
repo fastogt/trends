@@ -227,6 +227,7 @@ def main():
     else:
         pages = []
 
+    logging.basicConfig(filename='gen_csv.log', level=logging.INFO)
     # Prepare the API service
     credentials = load_oauth2_credentials(args.secrets_file)
     service = create_search_console_client(credentials)
@@ -267,6 +268,7 @@ def main():
                     continue
 
                 if 'rows' in response:
+                    logging.info("Request for day: {0}, received.".format(day_str))
 
                     if pages:
                         filters = [pages[0], 'worldwide']
