@@ -5,30 +5,31 @@ import logging
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from trend_info import TrendInfo
 from collections import defaultdict
+
 import argparse
 
 CSV_HEADER = ['date', 'key', 'clicks', 'impressions', 'ctr', 'position', 'property', 'country']
+PRECISION = 3
 
 
-def trend(data: list):
+def round_value(value):
+    return round(value, PRECISION)
+
+
+def make_trend_info(key: str, x: np.array, y: np.array, valid_dots_percent):
     """ Determine trend """
-    if len(data) < 3:
+    data_size = len(x)
+    if data_size < 3:
         return None
-    y = np.array(data)
-    x = np.array(range(len(data)))
-    A = np.vstack([x, np.ones(len(x))]).T
-    m, c = np.linalg.lstsq(A, y)[0]
-    trend = 'constant'
-    if m > 0:
-        trend = 'rising'
-    if m < 0:
-        trend = 'falling'
+
+    ones = np.ones(data_size)
+    A = np.vstack([x, ones]).T
+    m, c = np.linalg.lstsq(A, y, rcond=None)[0]
     mean = np.mean(y)
-    return {'trend_rate': m,
-            'trend_offset': c,
-            'trend': trend,
-            'mean': mean}
+    return TrendInfo(key, m, round_value(c), round_value(mean), round_value(y.max()), round_value(y.min()),
+                     round_value(valid_dots_percent))
 
 
 def read_keys_from_file(page_filters_file):
@@ -51,6 +52,21 @@ def parse_command_line_options():
     return parser.parse_args()
 
 
+def filter_keys(keys):
+    counted = defaultdict(int)
+    max_count = 0
+    for i, v in enumerate(keys):
+        counted[v] += 1
+        if counted[v] > max_count:
+            max_count = counted[v]
+
+    filtered_keys = []
+    for key, value in counted.items():
+        if value >= max_count / 2:
+            filtered_keys.append(key)
+    return filtered_keys
+
+
 def main():
     """
         Fetch and parse all command line options.
@@ -69,31 +85,43 @@ def main():
     data = csv[CSV_HEADER]
 
     data_rows_count_start = len(data)
+    all_keys = data['key'].tolist()
     if not keys:
-        all_keys = data['key'].tolist()
-        counted = defaultdict(int)
-        max_count = 0
-        for i, v in enumerate(all_keys):
-            counted[v] += 1
-            if counted[v] > max_count:
-                max_count = counted[v]
-
-        keys = []
-        ls2_sum = 0
-        for key, value in counted.items():
-            if value > max_count / 2:
-                keys.append(key)
-                ls2_sum += value
-
-        data = data.loc[data['key'].isin(keys)]
+        keys = filter_keys(all_keys)
 
     data = data.loc[data['key'].isin(keys)]
+
+    grouped_data_keys = data.groupby(data['key'].tolist(), as_index=False)
+    dates = data['date'].unique()
+
+    trends = []
+    for key, row in grouped_data_keys:
+        values = np.zeros(len(dates))
+
+        sl_dates = row['date'].tolist()
+        sl_values = row[args.plot_field].tolist()
+        valid_dots_percent = len(sl_dates) / len(dates)
+        for i, date in enumerate(sl_dates):
+            val = sl_values[i]
+            ind = np.where(dates == date)
+            values[ind] = val
+
+        tr = make_trend_info(key, dates, values, valid_dots_percent)
+        if tr:
+            trends.append(tr)
+
+    trends.sort()
+    for trend in trends:
+        print(trend)
 
     x = data['date']
     y = data[args.plot_field]
     data_rows_count_filtered = len(data)
-    plt.figure('{0} ({1}) {2}/{3}'.format(args.csv_file_path, args.plot_field, data_rows_count_filtered,
-                                          data_rows_count_start))
+    # title
+    plt.title('{0} {1}/{2}'.format(args.csv_file_path, data_rows_count_filtered, data_rows_count_start))
+    plt.xlabel('Date')
+    plt.ylabel(args.plot_field)
+
     plt.scatter(x, y)
 
     z = np.polyfit(x, y, 1)
